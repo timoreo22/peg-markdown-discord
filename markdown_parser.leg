@@ -67,10 +67,6 @@ Block =     BlankLine*
             | Verbatim
             | Note
             | Reference
-            | HorizontalRule
-            | Heading
-            | OrderedList
-            | BulletList
             | HtmlBlock
             | StyleBlock
             | Para
@@ -82,30 +78,12 @@ Para =      NonindentSpace a:Inlines BlankLine+
 Plain =     a:Inlines
             { $$ = a; $$->key = PLAIN; }
 
-AtxInline = !Newline !(Sp '#'* Sp Newline) Inline
-
 AtxStart =  < ( "######" | "#####" | "####" | "###" | "##" | "#" ) >
             { $$ = mk_element(H1 + (strlen(yytext) - 1)); }
-
-AtxHeading = s:AtxStart Sp a:StartList ( AtxInline { a = cons($$, a); } )+ (Sp '#'* Sp)?  Newline
-            { $$ = mk_list(s->key, a);
-              free(s); }
-
-SetextHeading = SetextHeading1 | SetextHeading2
 
 SetextBottom1 = '='+ Newline
 
 SetextBottom2 = '-'+ Newline
-
-SetextHeading1 =  &(RawLine SetextBottom1)
-                  a:StartList ( !Endline Inline { a = cons($$, a); } )+ Sp Newline
-                  SetextBottom1 { $$ = mk_list(H1, a); }
-
-SetextHeading2 =  &(RawLine SetextBottom2)
-                  a:StartList ( !Endline Inline { a = cons($$, a); } )+ Sp Newline
-                  SetextBottom2 { $$ = mk_list(H2, a); }
-
-Heading = SetextHeading | AtxHeading
 
 BlockQuote = a:BlockQuoteRaw
              {  $$ = mk_element(BLOCKQUOTE);
@@ -138,75 +116,6 @@ HorizontalRule = NonindentSpace
                  | '_' Sp '_' Sp '_' (Sp '_')*)
                  Sp Newline BlankLine+
                  { $$ = mk_element(HRULE); }
-
-Bullet = !HorizontalRule NonindentSpace ('+' | '*' | '-') Spacechar+
-
-BulletList = &Bullet (ListTight | ListLoose)
-             { $$->key = BULLETLIST; }
-
-ListTight = a:StartList
-            ( ListItemTight { a = cons($$, a); } )+
-            BlankLine* !(Bullet | Enumerator)
-            { $$ = mk_list(LIST, a); }
-
-ListLoose = a:StartList
-            ( b:ListItem BlankLine*
-              {   element *li;
-                  li = b->children;
-                  li->contents.str = realloc(li->contents.str, strlen(li->contents.str) + 3);
-                  strcat(li->contents.str, "\n\n");  /* In loose list, \n\n added to end of each element */
-                  a = cons(b, a);
-              } )+
-            { $$ = mk_list(LIST, a); }
-
-ListItem =  ( Bullet | Enumerator )
-            a:StartList
-            ListBlock { a = cons($$, a); }
-            ( ListContinuationBlock { a = cons($$, a); } )*
-            {  element *raw;
-               raw = mk_str_from_list(a, false);
-               raw->key = RAW;
-               $$ = mk_element(LISTITEM);
-               $$->children = raw;
-            }
-
-ListItemTight =
-            ( Bullet | Enumerator )
-            a:StartList
-            ListBlock { a = cons($$, a); }
-            ( !BlankLine
-              ListContinuationBlock { a = cons($$, a); } )*
-            !ListContinuationBlock
-            {  element *raw;
-               raw = mk_str_from_list(a, false);
-               raw->key = RAW;
-               $$ = mk_element(LISTITEM);
-               $$->children = raw;
-            }
-
-ListBlock = a:StartList
-            !BlankLine Line { a = cons($$, a); }
-            ( ListBlockLine { a = cons($$, a); } )*
-            { $$ = mk_str_from_list(a, false); }
-
-ListContinuationBlock = a:StartList
-                        ( < BlankLine* >
-                          {   if (strlen(yytext) == 0)
-                                   a = cons(mk_str("\001"), a); /* block separator */
-                              else
-                                   a = cons(mk_str(yytext), a); } )
-                        ( Indent ListBlock { a = cons($$, a); } )+
-                        {  $$ = mk_str_from_list(a, false); }
-
-Enumerator = NonindentSpace [0-9]+ '.' Spacechar+
-
-OrderedList = &Enumerator (ListTight | ListLoose)
-              { $$->key = ORDEREDLIST; }
-
-ListBlockLine = !BlankLine
-                !( Indent? (Bullet | Enumerator) )
-                !HorizontalRule
-                OptionallyIndentedLine
 
 # Parsers for different kinds of block-level HTML content.
 # This is repetitive due to constraints of PEG grammar.
@@ -423,6 +332,8 @@ Inline  = Str
         | UlOrStarLine
         | Space
         | Strong
+        | Spoiler
+        | Underline
         | Emph
         | Strike
         | Image
@@ -485,7 +396,7 @@ Whitespace = Spacechar | Newline
 EmphStar =  '*' !Whitespace
             a:StartList
             ( !'*' b:Inline { a = cons(b, a); }
-            | b:StrongStar  { a = cons(b, a); }
+            | b:Strong  { a = cons(b, a); }
             )+
             '*'
             { $$ = mk_list(EMPH, a); }
@@ -493,24 +404,28 @@ EmphStar =  '*' !Whitespace
 EmphUl =    '_' !Whitespace
             a:StartList
             ( !'_' b:Inline { a = cons(b, a); }
-            | b:StrongUl  { a = cons(b, a); }
+            | b:Underline  { a = cons(b, a); }
             )+
             '_'
             { $$ = mk_list(EMPH, a); }
 
-Strong = StrongStar | StrongUl
-
-StrongStar =    "**" !Whitespace
+Strong =    "**" !Whitespace
                 a:StartList
                 ( !"**" b:Inline { a = cons(b, a); })+
                 "**"
                 { $$ = mk_list(STRONG, a); }
 
-StrongUl   =    "__" !Whitespace
+Spoiler =    "||" !Whitespace
+                a:StartList
+( !"||" b:Inline { a = cons(b, a); })+
+"||"
+{ $$ = mk_list(SPOILER, a); }
+
+Underline   =    "__" !Whitespace
                 a:StartList
                 ( !"__" b:Inline { a = cons(b, a); })+
                 "__"
-                { $$ = mk_list(STRONG, a); }
+                { $$ = mk_list(UNDERLINE, a); }
 
 Strike = &{ extension(EXT_STRIKE) }
          "~~" !Whitespace
@@ -626,14 +541,10 @@ References = a:StartList
 Ticks1 = "`" !'`'
 Ticks2 = "``" !'`'
 Ticks3 = "```" !'`'
-Ticks4 = "````" !'`'
-Ticks5 = "`````" !'`'
 
 Code = ( Ticks1 Sp < ( ( !'`' Nonspacechar )+ | !Ticks1 '`'+ | !( Sp Ticks1 ) ( Spacechar | Newline !BlankLine ) )+ > Sp Ticks1
        | Ticks2 Sp < ( ( !'`' Nonspacechar )+ | !Ticks2 '`'+ | !( Sp Ticks2 ) ( Spacechar | Newline !BlankLine ) )+ > Sp Ticks2
        | Ticks3 Sp < ( ( !'`' Nonspacechar )+ | !Ticks3 '`'+ | !( Sp Ticks3 ) ( Spacechar | Newline !BlankLine ) )+ > Sp Ticks3
-       | Ticks4 Sp < ( ( !'`' Nonspacechar )+ | !Ticks4 '`'+ | !( Sp Ticks4 ) ( Spacechar | Newline !BlankLine ) )+ > Sp Ticks4
-       | Ticks5 Sp < ( ( !'`' Nonspacechar )+ | !Ticks5 '`'+ | !( Sp Ticks5 ) ( Spacechar | Newline !BlankLine ) )+ > Sp Ticks5
        )
        { $$ = mk_str(yytext); $$->key = CODE; }
 

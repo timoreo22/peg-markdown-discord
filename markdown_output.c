@@ -212,6 +212,16 @@ static void print_html_element(GString *out, element *elt, bool obfuscate) {
         print_html_element_list(out, elt->children, obfuscate);
         g_string_append_printf(out, "</strong>");
         break;
+    case SPOILER:
+        g_string_append_printf(out, "<span data-mx-spoiler>");
+        print_html_element_list(out, elt->children, obfuscate);
+        g_string_append_printf(out, "</span>");
+        break;
+    case UNDERLINE:
+        g_string_append_printf(out, "<u>");
+        print_html_element_list(out, elt->children, obfuscate);
+        g_string_append_printf(out, "</u>");
+        break;
     case STRIKE:
         g_string_append_printf(out, "<del>");
         print_html_element_list(out, elt->children, obfuscate);
@@ -223,14 +233,6 @@ static void print_html_element(GString *out, element *elt, bool obfuscate) {
     case RAW:
         /* Shouldn't occur - these are handled by process_raw_blocks() */
         assert(elt->key != RAW);
-        break;
-    case H1: case H2: case H3: case H4: case H5: case H6:
-        lev = elt->key - H1 + 1;  /* assumes H1 ... H6 are in order */
-        pad(out, 2);
-        g_string_append_printf(out, "<h%1d>", lev);
-        print_html_element_list(out, elt->children, obfuscate);
-        g_string_append_printf(out, "</h%1d>", lev);
-        padded = 0;
         break;
     case PLAIN:
         pad(out, 1);
@@ -259,32 +261,6 @@ static void print_html_element(GString *out, element *elt, bool obfuscate) {
         g_string_append_printf(out, "%s", "<pre><code>");
         print_html_string(out, elt->contents.str, obfuscate);
         g_string_append_printf(out, "%s", "</code></pre>");
-        padded = 0;
-        break;
-    case BULLETLIST:
-        pad(out, 2);
-        g_string_append_printf(out, "%s", "<ul>");
-        padded = 0;
-        print_html_element_list(out, elt->children, obfuscate);
-        pad(out, 1);
-        g_string_append_printf(out, "%s", "</ul>");
-        padded = 0;
-        break;
-    case ORDEREDLIST:
-        pad(out, 2);
-        g_string_append_printf(out, "%s", "<ol>");
-        padded = 0;
-        print_html_element_list(out, elt->children, obfuscate);
-        pad(out, 1);
-        g_string_append_printf(out, "</ol>");
-        padded = 0;
-        break;
-    case LISTITEM:
-        pad(out, 1);
-        g_string_append_printf(out, "<li>");
-        padded = 2;
-        print_html_element_list(out, elt->children, obfuscate);
-        g_string_append_printf(out, "</li>");
         padded = 0;
         break;
     case BLOCKQUOTE:
@@ -461,24 +437,6 @@ static void print_latex_element(GString *out, element *elt) {
         /* Shouldn't occur - these are handled by process_raw_blocks() */
         assert(elt->key != RAW);
         break;
-    case H1: case H2: case H3:
-        pad(out, 2);
-        lev = elt->key - H1 + 1;  /* assumes H1 ... H6 are in order */
-        g_string_append_printf(out, "\\");
-        for (i = elt->key; i > H1; i--)
-            g_string_append_printf(out, "sub");
-        g_string_append_printf(out, "section{");
-        print_latex_element_list(out, elt->children);
-        g_string_append_printf(out, "}");
-        padded = 0;
-        break;
-    case H4: case H5: case H6:
-        pad(out, 2);
-        g_string_append_printf(out, "\\noindent\\textbf{");
-        print_latex_element_list(out, elt->children);
-        g_string_append_printf(out, "}");
-        padded = 0;
-        break;
     case PLAIN:
         pad(out, 1);
         print_latex_element_list(out, elt->children);
@@ -503,31 +461,6 @@ static void print_latex_element(GString *out, element *elt) {
         print_latex_string(out, elt->contents.str);
         g_string_append_printf(out, "\n\\end{verbatim}");
         padded = 0;
-        break;
-    case BULLETLIST:
-        pad(out, 1);
-        g_string_append_printf(out, "\\begin{itemize}");
-        padded = 0;
-        print_latex_element_list(out, elt->children);
-        pad(out, 1);
-        g_string_append_printf(out, "\\end{itemize}");
-        padded = 0;
-        break;
-    case ORDEREDLIST:
-        pad(out, 1);
-        g_string_append_printf(out, "\\begin{enumerate}");
-        padded = 0;
-        print_latex_element_list(out, elt->children);
-        pad(out, 1);
-        g_string_append_printf(out, "\\end{enumerate}");
-        padded = 0;
-        break;
-    case LISTITEM:
-        pad(out, 1);
-        g_string_append_printf(out, "\\item ");
-        padded = 2;
-        print_latex_element_list(out, elt->children);
-        g_string_append_printf(out, "\n");
         break;
     case BLOCKQUOTE:
         pad(out, 1);
@@ -682,14 +615,6 @@ static void print_groff_mm_element(GString *out, element *elt, int count) {
         /* Shouldn't occur - these are handled by process_raw_blocks() */
         assert(elt->key != RAW);
         break;
-    case H1: case H2: case H3: case H4: case H5: case H6:
-        lev = elt->key - H1 + 1;
-        pad(out, 1);
-        g_string_append_printf(out, ".H %d \"", lev);
-        print_groff_mm_element_list(out, elt->children);
-        g_string_append_printf(out, "\"");
-        padded = 0;
-        break;
     case PLAIN:
         pad(out, 1);
         print_groff_mm_element_list(out, elt->children);
@@ -716,32 +641,6 @@ static void print_groff_mm_element(GString *out, element *elt, int count) {
         print_groff_string(out, elt->contents.str);
         g_string_append_printf(out, ".VERBOFF");
         padded = 0;
-        break;
-    case BULLETLIST:
-        pad(out, 1);
-        g_string_append_printf(out, ".BL");
-        padded = 0;
-        print_groff_mm_element_list(out, elt->children);
-        pad(out, 1);
-        g_string_append_printf(out, ".LE 1");
-        padded = 0;
-        break;
-    case ORDEREDLIST:
-        pad(out, 1);
-        g_string_append_printf(out, ".AL");
-        padded = 0;
-        print_groff_mm_element_list(out, elt->children);
-        pad(out, 1);
-        g_string_append_printf(out, ".LE 1");
-        padded = 0;
-        break;
-    case LISTITEM:
-        pad(out, 1);
-        g_string_append_printf(out, ".LI\n");
-        in_list_item = true;
-        padded = 2;
-        print_groff_mm_element_list(out, elt->children);
-        in_list_item = false;
         break;
     case BLOCKQUOTE:
         pad(out, 1);
@@ -983,13 +882,6 @@ static void print_odf_element(GString *out, element *elt) {
         /* Shouldn't occur - these are handled by process_raw_blocks() */
         assert(elt->key != RAW);
         break;
-    case H1: case H2: case H3: case H4: case H5: case H6:
-        lev = elt->key - H1 + 1;  /* assumes H1 ... H6 are in order */
-        g_string_append_printf(out, "<text:h text:outline-level=\"%d\">", lev);
-        print_odf_element_list(out, elt->children);
-        g_string_append_printf(out, "</text:h>\n");
-        padded = 0;
-        break;
     case PLAIN:
         print_odf_element_list(out, elt->children);
         padded = 0;
@@ -1005,10 +897,6 @@ static void print_odf_element(GString *out, element *elt) {
                 break;
             case VERBATIM:
                 g_string_append_printf(out," text:style-name=\"Preformatted Text\"");
-                break;
-            case ORDEREDLIST:
-            case BULLETLIST:
-                g_string_append_printf(out," text:style-name=\"P2\"");
                 break;
             case NOTE:
                 g_string_append_printf(out," text:style-name=\"Footnote\"");
@@ -1040,48 +928,6 @@ static void print_odf_element(GString *out, element *elt) {
         print_odf_code_string(out, elt->contents.str);
         g_string_append_printf(out, "</text:p>\n");
         odf_type = old_type;
-        break;
-    case BULLETLIST:
-        if ((odf_type == BULLETLIST) ||
-            (odf_type == ORDEREDLIST)) {
-            /* I think this was made unnecessary by another change.
-            Same for ORDEREDLIST below */
-            /*  g_string_append_printf(out, "</text:p>"); */
-        }
-        old_type = odf_type;
-        odf_type = BULLETLIST;
-        g_string_append_printf(out, "%s", "<text:list>");
-        print_odf_element_list(out, elt->children);
-        g_string_append_printf(out, "%s", "</text:list>");
-        odf_type = old_type;
-        break;
-    case ORDEREDLIST:
-        if ((odf_type == BULLETLIST) ||
-            (odf_type == ORDEREDLIST)) {
-            /* g_string_append_printf(out, "</text:p>"); */
-        }
-        old_type = odf_type;
-        odf_type = ORDEREDLIST;
-        g_string_append_printf(out, "%s", "<text:list>\n");
-        print_odf_element_list(out, elt->children);
-        g_string_append_printf(out, "%s", "</text:list>\n");
-        odf_type = old_type;
-        break;
-    case LISTITEM:
-        g_string_append_printf(out, "<text:list-item>\n");
-        if (elt->children->children->key != PARA) {
-            g_string_append_printf(out, "<text:p text:style-name=\"P2\">");
-        }
-        print_odf_element_list(out, elt->children);
-
-        if ((list_contains_key(elt->children,BULLETLIST) ||
-            (list_contains_key(elt->children,ORDEREDLIST)))) {
-            } else {
-                if (elt->children->children->key != PARA) {
-                    g_string_append_printf(out, "</text:p>");
-                }
-            }
-        g_string_append_printf(out, "</text:list-item>\n");
         break;
     case BLOCKQUOTE:
         old_type = odf_type;
