@@ -79,15 +79,6 @@ static void print_tree(element * elt, int indent) {
             case STRONG:             key = "STRONG"; break;
             case PLAIN:              key = "PLAIN"; break;
             case PARA:               key = "PARA"; break;
-            case LISTITEM:           key = "LISTITEM"; break;
-            case BULLETLIST:         key = "BULLETLIST"; break;
-            case ORDEREDLIST:        key = "ORDEREDLIST"; break;
-            case H1:                 key = "H1"; break;
-            case H2:                 key = "H2"; break;
-            case H3:                 key = "H3"; break;
-            case H4:                 key = "H4"; break;
-            case H5:                 key = "H5"; break;
-            case H6:                 key = "H6"; break;
             case BLOCKQUOTE:         key = "BLOCKQUOTE"; break;
             case VERBATIM:           key = "VERBATIM"; break;
             case HTMLBLOCK:          key = "HTMLBLOCK"; break;

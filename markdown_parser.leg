@@ -78,9 +78,6 @@ Para =      NonindentSpace a:Inlines BlankLine+
 Plain =     a:Inlines
             { $$ = a; $$->key = PLAIN; }
 
-AtxStart =  < ( "######" | "#####" | "####" | "###" | "##" | "#" ) >
-            { $$ = mk_element(H1 + (strlen(yytext) - 1)); }
-
 SetextBottom1 = '='+ Newline
 
 SetextBottom2 = '-'+ Newline
@@ -109,13 +106,6 @@ VerbatimChunk = a:StartList
 Verbatim =     a:StartList ( VerbatimChunk { a = cons($$, a); } )+
                { $$ = mk_str_from_list(a, false);
                  $$->key = VERBATIM; }
-
-HorizontalRule = NonindentSpace
-                 ( '*' Sp '*' Sp '*' (Sp '*')*
-                 | '-' Sp '-' Sp '-' (Sp '-')*
-                 | '_' Sp '_' Sp '_' (Sp '_')*)
-                 Sp Newline BlankLine+
-                 { $$ = mk_element(HRULE); }
 
 # Parsers for different kinds of block-level HTML content.
 # This is repetitive due to constraints of PEG grammar.
@@ -369,7 +359,7 @@ Entity =    ( HexEntity | DecEntity | CharEntity )
 
 Endline =   LineBreak | TerminalEndline | NormalEndline
 
-NormalEndline =   Sp Newline !BlankLine !'>' !AtxStart
+NormalEndline =   Sp Newline !BlankLine !'>'
                   !(Line ('='+ | '-'+) Newline)
                   { $$ = mk_str("\n");
                     $$->key = SPACE; }
